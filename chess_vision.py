@@ -14,11 +14,9 @@ import time
 import chess
 import keyboard
 
-from config import load_config, save_config, capture_screen, find_stockfish
-from board_detector import BoardDetector
-from piece_recognizer import PieceRecognizer
-from fen import FenGenerator
-from engine import ChessAdvisor
+from core import load_config, save_config, capture_screen, find_stockfish
+from core import ChessAdvisor, FenGenerator
+from vision import BoardDetector, PieceRecognizer
 
 
 def format_score(score):

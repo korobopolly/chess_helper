@@ -5,7 +5,7 @@ import json
 import cv2
 import numpy as np
 
-from config import TEMPLATES_DIR, SQUARE_SIZE, MATCH_THRESHOLD, PIECE_NAMES
+from core.config import TEMPLATES_DIR, SQUARE_SIZE, MATCH_THRESHOLD, PIECE_NAMES
 
 
 class PieceRecognizer:
