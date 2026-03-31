@@ -9,9 +9,9 @@ import cv2
 import mss
 import numpy as np
 
-SCRIPT_DIR = Path(__file__).parent
-TEMPLATES_DIR = SCRIPT_DIR / "templates"
-CONFIG_FILE = SCRIPT_DIR / "config.json"
+PROJECT_DIR = Path(__file__).parent.parent
+TEMPLATES_DIR = PROJECT_DIR / "data" / "templates"
+CONFIG_FILE = PROJECT_DIR / "config.json"
 
 SQUARE_SIZE = 64  # 템플릿 정규화 크기
 MATCH_THRESHOLD = 0.15  # 템플릿 매칭 신뢰도 임계값
