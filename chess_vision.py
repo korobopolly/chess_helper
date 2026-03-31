@@ -890,6 +890,15 @@ def main():
     keyboard.add_hotkey("f10", on_quit)
     keyboard.add_hotkey("f6", on_reset)
 
+    def format_score(score):
+        """PovScore를 읽기 쉬운 문자열로 변환합니다."""
+        white = score.white()
+        if white.is_mate():
+            mate_in = white.mate()
+            return f"M{mate_in}" if mate_in > 0 else f"M{mate_in}"
+        cp = white.score()
+        return f"{cp/100:+.2f}"
+
     def analyze_fen(fen):
         """FEN을 엔진으로 분석하여 최선의 수를 출력합니다."""
         if not advisor:
@@ -903,11 +912,12 @@ def main():
 
         board_obj = chess.Board(fen)
         san = board_obj.san(best_move)
-        print(f"\n  ★ {san}  ({score})")
+        uci = best_move.uci()
+        print(f"\n  ★ {san} ({uci})  {format_score(score)}")
         if len(lines) > 1:
             for i, (mv, sc) in enumerate(lines[:3]):
                 mv_san = board_obj.san(mv)
-                print(f"    {i+1}. {mv_san} ({sc})")
+                print(f"    {i+1}. {mv_san} ({mv.uci()})  {format_score(sc)}")
         print()
 
     def on_analyze(side):
