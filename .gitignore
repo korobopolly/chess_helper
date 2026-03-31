@@ -1,4 +1,5 @@
 ﻿.omc
+__pycache__
 debug_squares
 debug_board.png
 templates
