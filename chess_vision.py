@@ -1,11 +1,10 @@
 """
 Chess Vision - 화면 인식 체스 프로그램
-화면에서 체스 보드를 인식하고 Stockfish로 최선의 수를 찾아 자동으로 둡니다.
+화면에서 체스 보드를 인식하고 Stockfish로 최선의 수를 찾아줍니다.
 
 사용법:
   python chess_vision.py --calibrate          # 초기 보정 (시작 위치 보드 필요)
-  python chess_vision.py                      # 분석 모드 (F9로 트리거)
-  python chess_vision.py --auto-play          # 자동 플레이 모드
+  python chess_vision.py                      # 분석 모드 (F8/F9로 트리거)
   python chess_vision.py --manual-select      # 수동 보드 영역 선택
 """
 
@@ -20,7 +19,6 @@ import cv2
 import keyboard
 import mss
 import numpy as np
-import pyautogui
 import chess
 import chess.engine
 from PIL import Image
@@ -243,24 +241,6 @@ class BoardDetector:
         size = max(w, h)
         self.cached_rect = (x, y, size, size)
         return self.cached_rect
-
-    def detect_orientation(self, board_img):
-        """보드 방향을 감지합니다 (백이 아래인지 위인지)."""
-        # 보드 하단 1/4과 상단 1/4의 기물 밀도 비교
-        h = board_img.shape[0]
-        sq = h // 8
-
-        # 2번째 랭크 (아래에서 두 번째 줄)의 밝기 분석
-        bottom_rank2 = board_img[6 * sq:7 * sq, :]
-        top_rank2 = board_img[sq:2 * sq, :]
-
-        # 백 폰은 밝은 색, 흑 폰은 어두운 색
-        bottom_bright = np.mean(bottom_rank2)
-        top_bright = np.mean(top_rank2)
-
-        # 밝은 기물(백)이 아래에 있으면 white 방향
-        self.orientation = "white" if bottom_bright >= top_bright else "black"
-        return self.orientation
 
     def detect_orientation_from_pieces(self, pieces_8x8):
         """인식된 기물 배열을 기반으로 보드 방향을 감지합니다.
@@ -630,7 +610,6 @@ class PieceRecognizer:
         color = self._detect_piece_color(square_gray, color_square)
         return "P" if color == "w" else "p"
 
-
 # ─── FEN 생성 ───────────────────────────────────────────────────────
 
 
@@ -796,116 +775,6 @@ class ChessAdvisor:
             self.engine = None
 
 
-# ─── 자동 플레이 ────────────────────────────────────────────────────
-
-
-class MoveExecutor:
-    """마우스 클릭으로 수를 실행합니다."""
-
-    def __init__(self, board_rect, orientation="white"):
-        self.board_rect = board_rect  # (x, y, w, h)
-        self.orientation = orientation
-
-    def square_to_pixel(self, square_name):
-        """
-        체스 칸 이름 (예: 'e2')을 화면 픽셀 좌표로 변환합니다.
-        """
-        x, y, w, h = self.board_rect
-        sq_size = w / 8
-
-        file_idx = ord(square_name[0]) - ord('a')  # 0-7
-        rank_idx = int(square_name[1]) - 1  # 0-7
-
-        if self.orientation == "white":
-            px = x + (file_idx + 0.5) * sq_size
-            py = y + (7 - rank_idx + 0.5) * sq_size
-        else:
-            px = x + (7 - file_idx + 0.5) * sq_size
-            py = y + (rank_idx + 0.5) * sq_size
-
-        return int(px), int(py)
-
-    def execute_move(self, move, delay=0.15):
-        """
-        수를 클릭으로 실행합니다.
-        move: chess.Move 객체
-        """
-        from_sq = chess.square_name(move.from_square)
-        to_sq = chess.square_name(move.to_square)
-
-        from_px, from_py = self.square_to_pixel(from_sq)
-        to_px, to_py = self.square_to_pixel(to_sq)
-
-        print(f"  [>] 클릭: {from_sq}({from_px},{from_py}) -> {to_sq}({to_px},{to_py})")
-
-        pyautogui.click(from_px, from_py)
-        time.sleep(delay)
-        pyautogui.click(to_px, to_py)
-
-        # 프로모션 처리
-        if move.promotion:
-            time.sleep(delay)
-            # 퀸 프로모션이 기본 (보통 첫 번째 옵션)
-            pyautogui.click(to_px, to_py)
-
-
-# ─── 화면 오버레이 표시 ─────────────────────────────────────────────
-
-
-def show_analysis(screenshot, board_rect, pieces, fen, best_move, score, lines):
-    """분석 결과를 화면에 오버레이로 표시합니다."""
-    display = screenshot.copy()
-    x, y, w, h = board_rect
-
-    # 보드 영역 표시
-    cv2.rectangle(display, (x, y), (x + w, y + h), (0, 255, 0), 3)
-
-    # 정보 텍스트
-    info_x = x + w + 20
-    info_y = y + 30
-    line_gap = 30
-
-    texts = [
-        f"FEN: {fen[:50]}...",
-        f"Best: {best_move}",
-        f"Score: {score}",
-        "---",
-    ]
-
-    for i, line_info in enumerate(lines[:3]):
-        move, sc = line_info
-        texts.append(f"  {i+1}. {move} ({sc})")
-
-    for i, text in enumerate(texts):
-        cv2.putText(display, text, (info_x, info_y + i * line_gap),
-                     cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
-
-    # 최선의 수 화살표 표시
-    if best_move:
-        sq_size = w / 8
-        from_sq = chess.square_name(best_move.from_square)
-        to_sq = chess.square_name(best_move.to_square)
-
-        def sq_to_px(sq_name):
-            f = ord(sq_name[0]) - ord('a')
-            r = int(sq_name[1]) - 1
-            px = int(x + (f + 0.5) * sq_size)
-            py = int(y + (7 - r + 0.5) * sq_size)
-            return (px, py)
-
-        pt1 = sq_to_px(from_sq)
-        pt2 = sq_to_px(to_sq)
-        cv2.arrowedLine(display, pt1, pt2, (0, 0, 255), 4, tipLength=0.3)
-
-    # 축소 표시
-    scale = min(1.0, 1200 / display.shape[1], 800 / display.shape[0])
-    display = cv2.resize(display, None, fx=scale, fy=scale)
-
-    cv2.imshow("Chess Vision - Analysis", display)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
-
-
 # ─── 메인 루프 ──────────────────────────────────────────────────────
 
 
@@ -915,8 +784,6 @@ def main():
                         help="Stockfish 실행 파일 경로")
     parser.add_argument("--depth", type=int, default=18,
                         help="분석 깊이 (기본: 18)")
-    parser.add_argument("--auto-play", action="store_true",
-                        help="자동 플레이 모드")
     parser.add_argument("--manual-select", action="store_true",
                         help="수동 보드 영역 선택")
     parser.add_argument("--calibrate", action="store_true",
@@ -976,13 +843,10 @@ def main():
         x, y, w, h = board_rect
         board_img = screenshot[y:y + h, x:x + w]
 
-        # 밝기 기반 방향 초기 감지
-        detector.detect_orientation(board_img)
-
         # 템플릿 추출
         recognizer.calibrate(board_img)
 
-        # 기물 인식 결과로 방향 재감지
+        # 기물 인식 결과로 방향 감지
         pieces = recognizer.recognize(board_img)
         detector.detect_orientation_from_pieces(pieces)
         print(f"[i] 보드 방향: {detector.orientation}")
